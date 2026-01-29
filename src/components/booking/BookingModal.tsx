@@ -156,7 +156,7 @@ function BookingSummary({
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       {/* Salon info */}
-      <div className="p-5 border-b border-gray-100">
+      <div className="p-5 border-b border-gray-200">
         <div className="flex gap-3">
           <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0">
             <Image src={salonImage} alt={salonName} width={64} height={64} className="w-full h-full object-cover" />
@@ -170,7 +170,7 @@ function BookingSummary({
                   <Star key={i} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
-              <span className="text-blue-600">({salonReviews.toLocaleString()})</span>
+              <span className="text-blue-600">({salonReviews.toLocaleString()} відгуків)</span>
             </div>
             <p className="text-xs text-gray-500 truncate mt-0.5">{salonAddress}</p>
           </div>
@@ -493,8 +493,13 @@ export function BookingModal({
       return;
     }
 
-    // Animate selection smoothly
-    setSelectedTimes(neededSlots);
+    // Animate selection step by step (slots are pre-checked so no phantom effect)
+    setSelectedTimes([]);
+    neededSlots.forEach((time, index) => {
+      setTimeout(() => {
+        setSelectedTimes(prev => [...prev, time]);
+      }, index * 100);
+    });
   };
 
   const getDayName = (date: Date) => {
@@ -984,14 +989,21 @@ export function BookingModal({
                     {/* Error message - mobile only (inline) */}
                     {slotSelectionError && (
                       <div
-                        className="lg:hidden mb-4 p-4 bg-red-50 rounded-xl border-2 border-red-300 shadow-lg animate-fadeIn"
+                        className="lg:hidden mb-4 p-4 bg-white rounded-xl border border-red-200 shadow-lg animate-fadeIn"
                       >
-                        <p className="text-sm text-red-700 font-semibold text-center">
-                          ⚠️ {slotSelectionError}
-                        </p>
-                        <p className="text-xs text-red-600 text-center mt-2">
-                          Будь ласка, оберіть час так, щоб {requiredSlots} слотів підряд були вільні
-                        </p>
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                            <span className="text-lg">⚠️</span>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-900 font-semibold">
+                              {slotSelectionError}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Будь ласка, оберіть час так, щоб {requiredSlots} слотів підряд були вільні
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
 
