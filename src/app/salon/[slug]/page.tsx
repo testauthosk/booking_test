@@ -119,6 +119,17 @@ function GalleryModal({
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  // Smooth close with animation
+  const handleSmoothClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsClosing(false);
+      setFullscreenMode(false);
+      onClose();
+    }, 300);
+  };
 
   // Minimum swipe distance
   const minSwipeDistance = 50;
@@ -195,7 +206,7 @@ function GalleryModal({
   if (fullscreenMode) {
     return (
       <div
-        className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
+        className={`fixed inset-0 z-[100] bg-black flex items-center justify-center ${isClosing ? 'animate-fadeOut' : 'fullpage-modal'}`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -273,7 +284,7 @@ function GalleryModal({
 
   // Gallery grid view
   return (
-    <div className="fixed inset-0 z-[100] bg-white">
+    <div className={`fixed inset-0 z-[100] bg-white ${isClosing ? 'animate-fadeOut' : 'fullpage-modal'}`}>
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-white border-b border-gray-100">
         <div className="flex items-center justify-between px-4 sm:px-6 h-14 sm:h-16">
@@ -282,7 +293,7 @@ function GalleryModal({
             <p className="text-xs sm:text-sm text-gray-500">{salonData.name}</p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleSmoothClose}
             className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
           >
             <X className="w-6 h-6 text-gray-600" />

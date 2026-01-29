@@ -307,8 +307,18 @@ export function BookingModal({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [isClosing, setIsClosing] = useState(false);
 
   const steps = ["Послуги", "Фахівець", "Час", "Підтвердження", "Готово"];
+
+  // Smooth close with animation
+  const handleSmoothClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsClosing(false);
+      onClose();
+    }, 300);
+  };
 
   // Calculate total duration based on selected services
   const allServices = services.flatMap(c => c.items);
@@ -545,13 +555,13 @@ export function BookingModal({
     if (hasSelections && currentStep < steps.length - 1) {
       setShowConfirmClose(true);
     } else {
-      onClose();
+      handleSmoothClose();
     }
   };
 
   const handleConfirmClose = () => {
     setShowConfirmClose(false);
-    onClose();
+    handleSmoothClose();
   };
 
   // Calendar navigation
@@ -601,7 +611,7 @@ export function BookingModal({
   const displayedServices = showAllServices ? allServices : allServices.slice(0, 5);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-white overflow-hidden fullpage-modal">
+    <div className={`fixed inset-0 z-[100] bg-white overflow-hidden ${isClosing ? 'animate-fadeOut' : 'fullpage-modal'}`}>
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-3 sm:px-6 h-14 sm:h-16 border-b border-gray-100 shrink-0">
@@ -1003,7 +1013,7 @@ export function BookingModal({
 
               {/* Step 3: Confirmation form */}
               {currentStep === 3 && (
-                <div className="pt-6">
+                <div>
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Підтвердження</h1>
 
                   <div className="space-y-4">
@@ -1165,7 +1175,7 @@ export function BookingModal({
             </div>
 
             {/* Sidebar - hidden on mobile */}
-            <div className="w-[340px] shrink-0 hidden lg:block">
+            <div className="w-[340px] shrink-0 hidden lg:flex lg:flex-col">
               <BookingSummary
                 salonName={salonName}
                 salonImage={salonImage}
@@ -1180,36 +1190,53 @@ export function BookingModal({
                 services={services}
                 totalDurationMinutes={roundedDuration}
               />
+
+              {/* Desktop button - aligned with sidebar */}
+              {currentStep < steps.length - 1 && (
+                <Button
+                  onClick={handleNext}
+                  disabled={!canProceed()}
+                  className="mt-4 w-full bg-gray-900 hover:bg-gray-800 text-white rounded-full px-8 h-12 font-semibold transition-all duration-200 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100 cursor-pointer"
+                >
+                  {currentStep === 3 ? "Підтвердити бронювання" : "Продовжити"}
+                </Button>
+              )}
+
+              {/* Close button on Done step - desktop */}
+              {currentStep === steps.length - 1 && (
+                <Button
+                  onClick={handleSmoothClose}
+                  className="mt-4 w-full bg-gray-900 hover:bg-gray-800 text-white rounded-full px-8 h-12 font-semibold transition-all duration-200 hover:shadow-lg active:scale-95 cursor-pointer"
+                >
+                  Закрити
+                </Button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Footer - except on Done step */}
+        {/* Footer - mobile/tablet only, hidden on desktop */}
         {currentStep < steps.length - 1 && (
-          <div className="px-4 sm:px-6 py-4 border-t border-gray-100 shrink-0 bg-white">
-            <div className="max-w-6xl mx-auto flex justify-end">
-              <Button
-                onClick={handleNext}
-                disabled={!canProceed()}
-                className="w-full sm:w-auto bg-gray-900 hover:bg-gray-800 text-white rounded-full px-8 h-12 font-semibold transition-all duration-200 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100 cursor-pointer"
-              >
-                {currentStep === 3 ? "Підтвердити бронювання" : "Продовжити"}
-              </Button>
-            </div>
+          <div className="lg:hidden px-4 sm:px-6 py-4 border-t border-gray-100 shrink-0 bg-white">
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="w-full bg-gray-900 hover:bg-gray-800 text-white rounded-full px-8 h-12 font-semibold transition-all duration-200 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100 cursor-pointer"
+            >
+              {currentStep === 3 ? "Підтвердити бронювання" : "Продовжити"}
+            </Button>
           </div>
         )}
 
-        {/* Close button on Done step */}
+        {/* Close button on Done step - mobile/tablet only */}
         {currentStep === steps.length - 1 && (
-          <div className="px-4 sm:px-6 py-4 border-t border-gray-100 shrink-0 bg-white">
-            <div className="max-w-6xl mx-auto flex justify-center">
-              <Button
-                onClick={onClose}
-                className="w-full sm:w-auto bg-gray-900 hover:bg-gray-800 text-white rounded-full px-8 h-12 font-semibold transition-all duration-200 hover:shadow-lg active:scale-95 cursor-pointer"
-              >
-                Закрити
-              </Button>
-            </div>
+          <div className="lg:hidden px-4 sm:px-6 py-4 border-t border-gray-100 shrink-0 bg-white">
+            <Button
+              onClick={handleSmoothClose}
+              className="w-full bg-gray-900 hover:bg-gray-800 text-white rounded-full px-8 h-12 font-semibold transition-all duration-200 hover:shadow-lg active:scale-95 cursor-pointer"
+            >
+              Закрити
+            </Button>
           </div>
         )}
       </div>
