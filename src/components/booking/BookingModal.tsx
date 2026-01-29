@@ -380,10 +380,37 @@ export function BookingModal({
       setTimeSlots(generateTimeSlots(selectedDate));
       setSelectedTimes([]);
       setSlotSelectionError(null);
-      // Auto-scroll to time slots after date selection
+      // Auto-scroll to time slots after date selection - smooth custom animation
       setTimeout(() => {
-        timeSlotsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
+        const element = timeSlotsRef.current;
+        if (element) {
+          const container = element.closest('.overflow-y-auto');
+          if (container) {
+            const targetPosition = element.offsetTop - 120;
+            const startPosition = container.scrollTop;
+            const distance = targetPosition - startPosition;
+            const duration = 600;
+            let startTime: number | null = null;
+
+            const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+            const animation = (currentTime: number) => {
+              if (startTime === null) startTime = currentTime;
+              const timeElapsed = currentTime - startTime;
+              const progress = Math.min(timeElapsed / duration, 1);
+              const easedProgress = easeOutCubic(progress);
+
+              container.scrollTop = startPosition + distance * easedProgress;
+
+              if (timeElapsed < duration) {
+                requestAnimationFrame(animation);
+              }
+            };
+
+            requestAnimationFrame(animation);
+          }
+        }
+      }, 200);
     }
   }, [selectedDate]);
 
@@ -574,7 +601,7 @@ export function BookingModal({
   const displayedServices = showAllServices ? allServices : allServices.slice(0, 5);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-white overflow-hidden">
+    <div className="fixed inset-0 z-[100] bg-white overflow-hidden fullpage-modal">
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-3 sm:px-6 h-14 sm:h-16 border-b border-gray-100 shrink-0">
@@ -623,12 +650,15 @@ export function BookingModal({
                         <div
                           key={service.id}
                           onClick={() => toggleService(service.id)}
-                          className={`p-4 rounded-2xl border-2 cursor-pointer transition-all duration-300 hover:shadow-md animate-slideUp ${
+                          className={`p-4 rounded-2xl border-2 cursor-pointer transition-all duration-300 hover:shadow-md opacity-0 ${
                             isSelected
                               ? "border-gray-900 bg-gray-50/50 shadow-sm"
                               : "border-gray-100 bg-white hover:border-gray-300"
                           }`}
-                          style={{ animationDelay: `${index * 50}ms` }}
+                          style={{
+                            animation: `fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards`,
+                            animationDelay: `${index * 80}ms`
+                          }}
                         >
                           <div className="flex items-center justify-between">
                             <div>
@@ -908,13 +938,18 @@ export function BookingModal({
 
                   {/* Time slots section with ref */}
                   <div ref={timeSlotsRef}>
-                    {/* Error message - more visible */}
+                    {/* Error message - highly visible with shake animation */}
                     {slotSelectionError && (
-                      <div className="mb-4 p-4 bg-amber-50 rounded-xl border border-amber-200 animate-pulse">
-                        <p className="text-sm text-amber-800 font-medium text-center">
-                          ⚠️ {slotSelectionError}
+                      <div
+                        className="mb-4 p-4 bg-red-50 rounded-xl border-2 border-red-300 shadow-lg"
+                        style={{
+                          animation: 'fadeIn 0.3s ease-out, shake 0.5s ease-out'
+                        }}
+                      >
+                        <p className="text-sm text-red-700 font-semibold text-center">
+                          ❌ {slotSelectionError}
                         </p>
-                        <p className="text-xs text-amber-600 text-center mt-1">
+                        <p className="text-xs text-red-600 text-center mt-2">
                           Будь ласка, оберіть час так, щоб {requiredSlots} слотів підряд були вільні
                         </p>
                       </div>
@@ -968,7 +1003,7 @@ export function BookingModal({
 
               {/* Step 3: Confirmation form */}
               {currentStep === 3 && (
-                <div className="pt-2">
+                <div className="pt-6">
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Підтвердження</h1>
 
                   <div className="space-y-4">
@@ -1017,7 +1052,7 @@ export function BookingModal({
                             if (digits.length > 7) formatted += ' ' + digits.slice(7, 9);
                             setPhone(formatted);
                           }}
-                          placeholder="66 635 18 55"
+                          placeholder="12 345 67 89"
                           className="flex-1 px-4 py-3 rounded-r-xl border border-gray-200 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none transition-all"
                         />
                       </div>

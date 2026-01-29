@@ -117,37 +117,55 @@ function GalleryModal({
   const [fullscreenMode, setFullscreenMode] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Minimum swipe distance
   const minSwipeDistance = 50;
 
   const goNext = () => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
     setCurrentIndex((prev) => (prev + 1) % photos.length);
+    setTimeout(() => setIsTransitioning(false), 500);
   };
 
   const goPrev = () => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
     setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
+    setTimeout(() => setIsTransitioning(false), 500);
   };
 
   const onTouchStart = (e: React.TouchEvent) => {
+    if (isTransitioning) return;
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (isTransitioning || touchStart === null) return;
+    const currentX = e.targetTouches[0].clientX;
+    setTouchEnd(currentX);
+    // Visual feedback during drag
+    const diff = currentX - touchStart;
+    setSwipeOffset(diff * 0.4);
   };
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    if (isTransitioning || !touchStart || !touchEnd) {
+      setSwipeOffset(0);
+      return;
+    }
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
+    setSwipeOffset(0);
 
-    if (isLeftSwipe) {
-      goNext();
-    } else if (isRightSwipe) {
-      goPrev();
+    if (Math.abs(distance) > minSwipeDistance) {
+      if (distance > 0) {
+        goNext();
+      } else {
+        goPrev();
+      }
     }
   };
 
@@ -203,13 +221,18 @@ function GalleryModal({
           <ChevronLeft className="w-8 h-8 text-white" />
         </button>
 
-        {/* Main image */}
-        <div className="relative w-full h-full flex items-center justify-center p-4">
+        {/* Main image with smooth transition */}
+        <div
+          className="relative w-full h-full flex items-center justify-center p-4 transition-transform duration-500 ease-out"
+          style={{
+            transform: `translateX(${swipeOffset}px)`,
+          }}
+        >
           <Image
             src={photos[currentIndex]}
             alt={`Фото ${currentIndex + 1}`}
             fill
-            className="object-contain"
+            className="object-contain transition-opacity duration-500 ease-out"
             priority
           />
         </div>
@@ -335,31 +358,75 @@ export default function SalonPage() {
   const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
   const reviewsRef = useRef<HTMLDivElement>(null);
 
-  // Swipe handlers for mobile gallery
+  // Swipe handlers for mobile gallery with smooth animation
   const minSwipeDistance = 50;
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
   const onTouchStart = (e: React.TouchEvent) => {
+    if (isTransitioning) return;
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (isTransitioning || touchStart === null) return;
+    const currentX = e.targetTouches[0].clientX;
+    setTouchEnd(currentX);
+    // Calculate offset for visual feedback during drag
+    const diff = currentX - touchStart;
+    setSwipeOffset(diff * 0.3); // Reduced for subtle effect
   };
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    if (isTransitioning || !touchStart || !touchEnd) {
+      setSwipeOffset(0);
+      return;
+    }
     const distance = touchStart - touchEnd;
-    if (distance > minSwipeDistance) {
-      setMobilePhotoIndex(prev => (prev + 1) % salonData.photos.length);
-    } else if (distance < -minSwipeDistance) {
-      setMobilePhotoIndex(prev => (prev - 1 + salonData.photos.length) % salonData.photos.length);
+    setSwipeOffset(0);
+
+    if (Math.abs(distance) > minSwipeDistance) {
+      setIsTransitioning(true);
+      if (distance > 0) {
+        setMobilePhotoIndex(prev => (prev + 1) % salonData.photos.length);
+      } else {
+        setMobilePhotoIndex(prev => (prev - 1 + salonData.photos.length) % salonData.photos.length);
+      }
+      // Reset transition state after animation
+      setTimeout(() => setIsTransitioning(false), 500);
     }
   };
 
-  // Scroll to reviews
+  // Scroll to reviews - smooth and slow
   const scrollToReviews = () => {
     setActiveTab("reviews");
     setTimeout(() => {
-      reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
+      // Custom smooth scroll with easing
+      const element = reviewsRef.current;
+      if (element) {
+        const targetPosition = element.getBoundingClientRect().top + window.pageYOffset - 100;
+        const startPosition = window.pageYOffset;
+        const distance = targetPosition - startPosition;
+        const duration = 800; // Longer duration for smoother feel
+        let startTime: number | null = null;
+
+        const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+        const animation = (currentTime: number) => {
+          if (startTime === null) startTime = currentTime;
+          const timeElapsed = currentTime - startTime;
+          const progress = Math.min(timeElapsed / duration, 1);
+          const easedProgress = easeOutCubic(progress);
+
+          window.scrollTo(0, startPosition + distance * easedProgress);
+
+          if (timeElapsed < duration) {
+            requestAnimationFrame(animation);
+          }
+        };
+
+        requestAnimationFrame(animation);
+      }
+    }, 150);
   };
 
   // Update underline position when active tab changes
@@ -495,13 +562,20 @@ export default function SalonPage() {
                 onTouchEnd={onTouchEnd}
                 onClick={() => openGallery(mobilePhotoIndex)}
               >
-                <Image
-                  src={salonData.photos[mobilePhotoIndex]}
-                  alt={salonData.name}
-                  fill
-                  className="object-cover transition-opacity duration-300"
-                  priority
-                />
+                <div
+                  className="absolute inset-0 transition-all duration-500 ease-out"
+                  style={{
+                    transform: `translateX(${swipeOffset}px)`,
+                  }}
+                >
+                  <Image
+                    src={salonData.photos[mobilePhotoIndex]}
+                    alt={salonData.name}
+                    fill
+                    className="object-cover transition-all duration-500 ease-out"
+                    priority
+                  />
+                </div>
                 {/* Dot indicators */}
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
                   {salonData.photos.map((_, index) => (
@@ -516,6 +590,7 @@ export default function SalonPage() {
                       }`}
                     />
                   ))}
+                </div>
                 </div>
                 {/* Counter */}
                 <div className="absolute top-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
