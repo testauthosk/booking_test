@@ -13,7 +13,7 @@ import {
   Navigation,
   X,
   ChevronLeft,
-  Share2,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BookingModal } from "@/components/booking/BookingModal";
@@ -101,7 +101,7 @@ const reviews = [
   { id: "4", author: "Маріо С", initial: "М", color: "bg-orange-500", date: "14 лип 2024", rating: 5, text: "Мілош - найкращий ❤️", service: "Стрижка + борода" },
 ];
 
-// Gallery Modal Component
+// Gallery Modal Component with fullscreen view and swipe
 function GalleryModal({
   isOpen,
   onClose,
@@ -114,8 +114,12 @@ function GalleryModal({
   initialIndex?: number;
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [fullscreenMode, setFullscreenMode] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  if (!isOpen) return null;
+  // Minimum swipe distance
+  const minSwipeDistance = 50;
 
   const goNext = () => {
     setCurrentIndex((prev) => (prev + 1) % photos.length);
@@ -125,14 +129,134 @@ function GalleryModal({
     setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
   };
 
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      goNext();
+    } else if (isRightSwipe) {
+      goPrev();
+    }
+  };
+
+  const openFullscreen = (index: number) => {
+    setCurrentIndex(index);
+    setFullscreenMode(true);
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    setCurrentIndex(initialIndex);
+  }, [initialIndex]);
+
+  if (!isOpen) return null;
+
+  // Fullscreen image viewer
+  if (fullscreenMode) {
+    return (
+      <div
+        className="fixed inset-0 z-[100] bg-black flex items-center justify-center"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Close button */}
+        <button
+          onClick={() => setFullscreenMode(false)}
+          className="absolute top-4 right-4 z-20 w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors cursor-pointer"
+        >
+          <X className="w-6 h-6 text-white" />
+        </button>
+
+        {/* Counter */}
+        <div className="absolute top-4 left-4 z-20 px-3 py-1.5 rounded-full bg-black/50 text-white text-sm font-medium">
+          {currentIndex + 1} / {photos.length}
+        </div>
+
+        {/* Previous button */}
+        <button
+          onClick={goPrev}
+          className="absolute left-4 z-20 w-14 h-14 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors cursor-pointer"
+        >
+          <ChevronLeft className="w-8 h-8 text-white" />
+        </button>
+
+        {/* Main image */}
+        <div className="relative w-full h-full flex items-center justify-center p-4">
+          <Image
+            src={photos[currentIndex]}
+            alt={`Фото ${currentIndex + 1}`}
+            fill
+            className="object-contain"
+            priority
+          />
+        </div>
+
+        {/* Next button */}
+        <button
+          onClick={goNext}
+          className="absolute right-4 z-20 w-14 h-14 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors cursor-pointer"
+        >
+          <ChevronRight className="w-8 h-8 text-white" />
+        </button>
+
+        {/* Thumbnail strip at bottom */}
+        <div className="absolute bottom-4 left-0 right-0 z-20">
+          <div className="flex justify-center gap-2 px-4 overflow-x-auto">
+            {photos.map((photo, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(index)}
+                className={`w-16 h-16 rounded-lg overflow-hidden shrink-0 transition-all cursor-pointer ${
+                  index === currentIndex ? "ring-2 ring-white scale-110" : "opacity-60 hover:opacity-100"
+                }`}
+              >
+                <Image
+                  src={photo}
+                  alt={`Міні ${index + 1}`}
+                  width={64}
+                  height={64}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Gallery grid view
   return (
-    <div className="fixed inset-0 z-[100] bg-white fullpage-modal">
+    <div className="fixed inset-0 z-[100] bg-white">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-white border-b border-gray-100">
-        <div className="flex items-center justify-between px-6 h-16">
+        <div className="flex items-center justify-between px-4 sm:px-6 h-14 sm:h-16">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Галерея зображень</h2>
-            <p className="text-sm text-gray-500">{salonData.name}</p>
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900">Галерея зображень</h2>
+            <p className="text-xs sm:text-sm text-gray-500">{salonData.name}</p>
           </div>
           <button
             onClick={onClose}
@@ -144,31 +268,41 @@ function GalleryModal({
       </div>
 
       {/* Gallery Grid */}
-      <div className="pt-20 pb-8 px-6 h-full overflow-y-auto">
+      <div className="pt-16 sm:pt-20 pb-8 px-4 sm:px-6 h-full overflow-y-auto">
         <div className="max-w-6xl mx-auto">
-          {/* Main large image */}
-          <div className="relative aspect-[16/10] rounded-2xl overflow-hidden mb-4">
+          {/* Main large image - clickable */}
+          <div
+            onClick={() => openFullscreen(0)}
+            className="relative aspect-[16/10] rounded-2xl overflow-hidden mb-4 cursor-pointer group"
+          >
             <Image
               src={photos[0]}
               alt="Головне фото"
               fill
-              className="object-cover"
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full px-4 py-2 text-sm font-medium text-gray-900">
+                Відкрити
+              </div>
+            </div>
           </div>
 
-          {/* Grid of smaller images */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Grid of smaller images - clickable */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {photos.slice(1).map((photo, index) => (
               <div
                 key={index}
-                className="relative aspect-[4/3] rounded-2xl overflow-hidden"
+                onClick={() => openFullscreen(index + 1)}
+                className="relative aspect-[4/3] rounded-2xl overflow-hidden cursor-pointer group"
               >
                 <Image
                   src={photo}
                   alt={`Фото ${index + 2}`}
                   fill
-                  className="object-cover"
+                  className="object-cover group-hover:scale-105 transition-transform duration-300"
                 />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
               </div>
             ))}
           </div>
@@ -192,10 +326,41 @@ export default function SalonPage() {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [mobilePhotoIndex, setMobilePhotoIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   // Refs and state for animated tab underline
   const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
   const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
+  const reviewsRef = useRef<HTMLDivElement>(null);
+
+  // Swipe handlers for mobile gallery
+  const minSwipeDistance = 50;
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    if (distance > minSwipeDistance) {
+      setMobilePhotoIndex(prev => (prev + 1) % salonData.photos.length);
+    } else if (distance < -minSwipeDistance) {
+      setMobilePhotoIndex(prev => (prev - 1 + salonData.photos.length) % salonData.photos.length);
+    }
+  };
+
+  // Scroll to reviews
+  const scrollToReviews = () => {
+    setActiveTab("reviews");
+    setTimeout(() => {
+      reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
 
   // Update underline position when active tab changes
   useLayoutEffect(() => {
@@ -267,7 +432,12 @@ export default function SalonPage() {
                       ))}
                     </div>
                     <span className="font-semibold text-gray-900 text-lg">{salonData.rating}</span>
-                    <span className="text-gray-500">({salonData.reviewCount.toLocaleString()} відгуків)</span>
+                    <button
+                      onClick={scrollToReviews}
+                      className="text-blue-600 hover:text-blue-700 hover:underline cursor-pointer transition-colors"
+                    >
+                      ({salonData.reviewCount.toLocaleString()} відгуків)
+                    </button>
                   </div>
 
                   <span className="text-gray-300 text-lg">•</span>
@@ -306,7 +476,7 @@ export default function SalonPage() {
                 }}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 cursor-pointer active:scale-95 self-end mb-0.5"
               >
-                <Share2 className="w-4 h-4 text-gray-600" />
+                <Upload className="w-4 h-4 text-gray-600" />
                 <span className="text-sm font-medium text-gray-700 hidden sm:inline">Поділитися</span>
               </button>
             </div>
@@ -316,8 +486,59 @@ export default function SalonPage() {
         {/* Gallery Section */}
         <div className="bg-white">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            {/* Photo Gallery - Fresha Style: 1 large + 2 small stacked */}
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_0.4fr] gap-2 h-[350px] lg:h-[420px]">
+            {/* Mobile Swipeable Gallery */}
+            <div className="lg:hidden">
+              <div
+                className="relative h-[300px] rounded-xl overflow-hidden bg-gray-100"
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+                onClick={() => openGallery(mobilePhotoIndex)}
+              >
+                <Image
+                  src={salonData.photos[mobilePhotoIndex]}
+                  alt={salonData.name}
+                  fill
+                  className="object-cover transition-opacity duration-300"
+                  priority
+                />
+                {/* Dot indicators */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  {salonData.photos.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMobilePhotoIndex(index);
+                      }}
+                      className={`w-2 h-2 rounded-full transition-all ${
+                        index === mobilePhotoIndex ? "bg-white w-6" : "bg-white/50"
+                      }`}
+                    />
+                  ))}
+                </div>
+                {/* Counter */}
+                <div className="absolute top-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
+                  {mobilePhotoIndex + 1} / {salonData.photos.length}
+                </div>
+                {/* View all button */}
+                <button
+                  className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm text-gray-900 px-3 py-2 rounded-full text-sm font-medium flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openGallery(0);
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Усі фото
+                </button>
+              </div>
+            </div>
+
+            {/* Desktop Gallery - Fresha Style: 1 large + 2 small stacked */}
+            <div className="hidden lg:grid lg:grid-cols-[1fr_0.4fr] gap-2 h-[420px]">
               {/* Large Image */}
               <div
                 className="relative rounded-xl overflow-hidden bg-gray-100 cursor-pointer group"
@@ -346,7 +567,7 @@ export default function SalonPage() {
               </div>
 
               {/* Small Images Stack */}
-              <div className="hidden lg:grid grid-rows-2 gap-2">
+              <div className="grid grid-rows-2 gap-2">
                 <div
                   className="relative rounded-xl overflow-hidden bg-gray-100 cursor-pointer group"
                   onClick={() => openGallery(1)}
@@ -525,7 +746,7 @@ export default function SalonPage() {
 
               {/* Reviews Section */}
               {activeTab === "reviews" && (
-                <section className="animate-fadeIn">
+                <section ref={reviewsRef} className="animate-fadeIn">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Відгуки</h2>
 
                   {/* Rating Summary - Compact like Fresha */}
@@ -539,7 +760,7 @@ export default function SalonPage() {
                       ))}
                     </div>
                     <span className="text-lg font-semibold text-gray-900">{salonData.rating.toFixed(1).replace('.', ',')}</span>
-                    <span className="text-blue-600 hover:underline cursor-pointer">({salonData.reviewCount.toLocaleString().replace(',', ' ')})</span>
+                    <span className="text-blue-600">({salonData.reviewCount.toLocaleString().replace(',', ' ')} відгуків)</span>
                   </div>
 
                   {/* Reviews Grid - 2 columns like Fresha */}

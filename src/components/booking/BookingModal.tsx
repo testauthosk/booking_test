@@ -373,12 +373,17 @@ export function BookingModal({
   const dates = generateDates();
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [slotSelectionError, setSlotSelectionError] = useState<string | null>(null);
+  const timeSlotsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (selectedDate) {
       setTimeSlots(generateTimeSlots(selectedDate));
       setSelectedTimes([]);
       setSlotSelectionError(null);
+      // Auto-scroll to time slots after date selection
+      setTimeout(() => {
+        timeSlotsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     }
   }, [selectedDate]);
 
@@ -452,7 +457,7 @@ export function BookingModal({
       case 0: return selectedServices.length > 0;
       case 1: return selectedSpecialist !== null;
       case 2: return selectedDate !== null && selectedTimes.length === requiredSlots;
-      case 3: return firstName.trim() !== "" && lastName.trim() !== "" && phone.trim().length >= 10;
+      case 3: return firstName.trim() !== "" && lastName.trim() !== "" && phone.replace(/\s/g, '').length >= 9;
       default: return true;
     }
   };
@@ -608,21 +613,22 @@ export function BookingModal({
             <div className="flex-1 overflow-y-auto pb-4">
               {/* Step 0: Services */}
               {currentStep === 0 && (
-                <div>
+                <div className="animate-fadeIn">
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Оберіть послуги</h1>
 
                   <div className="space-y-3">
-                    {displayedServices.map(service => {
+                    {displayedServices.map((service, index) => {
                       const isSelected = selectedServices.includes(service.id);
                       return (
                         <div
                           key={service.id}
                           onClick={() => toggleService(service.id)}
-                          className={`p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 hover:shadow-md ${
+                          className={`p-4 rounded-2xl border-2 cursor-pointer transition-all duration-300 hover:shadow-md animate-slideUp ${
                             isSelected
                               ? "border-gray-900 bg-gray-50/50 shadow-sm"
                               : "border-gray-100 bg-white hover:border-gray-300"
                           }`}
+                          style={{ animationDelay: `${index * 50}ms` }}
                         >
                           <div className="flex items-center justify-between">
                             <div>
@@ -900,61 +906,69 @@ export function BookingModal({
                     </>
                   )}
 
-                  {/* Error message */}
-                  {slotSelectionError && (
-                    <div className="mb-4 p-3 bg-red-50 rounded-xl border border-red-100">
-                      <p className="text-sm text-red-700">{slotSelectionError}</p>
-                    </div>
-                  )}
-
-                  {/* Time slots */}
-                  {!selectedDate ? (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                        <Calendar className="w-8 h-8 text-gray-400" />
+                  {/* Time slots section with ref */}
+                  <div ref={timeSlotsRef}>
+                    {/* Error message - more visible */}
+                    {slotSelectionError && (
+                      <div className="mb-4 p-4 bg-amber-50 rounded-xl border border-amber-200 animate-pulse">
+                        <p className="text-sm text-amber-800 font-medium text-center">
+                          ⚠️ {slotSelectionError}
+                        </p>
+                        <p className="text-xs text-amber-600 text-center mt-1">
+                          Будь ласка, оберіть час так, щоб {requiredSlots} слотів підряд були вільні
+                        </p>
                       </div>
-                      <p className="text-gray-500 font-medium">Оберіть дату щоб побачити доступний час</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {timeSlots.length === 0 ? (
-                        <div className="text-center py-12">
-                          <p className="text-gray-500 font-medium">Завантаження...</p>
-                        </div>
-                      ) : (
-                        timeSlots.map(slot => {
-                          const isSelected = selectedTimes.includes(slot.time);
-                          const isBooked = slot.booked;
+                    )}
 
-                          return (
-                            <button
-                              key={slot.time}
-                              onClick={() => slot.available && handleTimeSlotClick(slot.time)}
-                              disabled={!slot.available}
-                              className={`w-full p-4 rounded-xl border-2 text-center font-medium transition-all duration-200 ${
-                                isBooked
-                                  ? "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed line-through"
-                                  : isSelected
-                                    ? "border-gray-900 bg-gray-900 text-white shadow-lg cursor-pointer"
-                                    : "border-gray-100 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98] cursor-pointer"
-                              }`}
-                            >
-                              <span className="flex items-center justify-center gap-2">
-                                {slot.time}
-                                {isBooked && <span className="text-xs">(зайнято)</span>}
-                              </span>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
+                    {/* Time slots */}
+                    {!selectedDate ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                          <Calendar className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <p className="text-gray-500 font-medium">Оберіть дату щоб побачити доступний час</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {timeSlots.length === 0 ? (
+                          <div className="text-center py-12">
+                            <p className="text-gray-500 font-medium">Завантаження...</p>
+                          </div>
+                        ) : (
+                          timeSlots.map(slot => {
+                            const isSelected = selectedTimes.includes(slot.time);
+                            const isBooked = slot.booked;
+
+                            return (
+                              <button
+                                key={slot.time}
+                                onClick={() => slot.available && handleTimeSlotClick(slot.time)}
+                                disabled={!slot.available}
+                                className={`w-full p-4 rounded-xl border-2 text-center font-medium transition-all duration-200 ${
+                                  isBooked
+                                    ? "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed line-through"
+                                    : isSelected
+                                      ? "border-gray-900 bg-gray-900 text-white shadow-lg cursor-pointer"
+                                      : "border-gray-100 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98] cursor-pointer"
+                                }`}
+                              >
+                                <span className="flex items-center justify-center gap-2">
+                                  {slot.time}
+                                  {isBooked && <span className="text-xs">(зайнято)</span>}
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* Step 3: Confirmation form */}
               {currentStep === 3 && (
-                <div>
+                <div className="pt-2">
                   <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Підтвердження</h1>
 
                   <div className="space-y-4">
@@ -982,16 +996,31 @@ export function BookingModal({
                       />
                     </div>
 
-                    {/* Phone */}
+                    {/* Phone with +380 prefix */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Номер телефону *</label>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="+380"
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none transition-all"
-                      />
+                      <div className="flex">
+                        <span className="inline-flex items-center px-4 py-3 rounded-l-xl border border-r-0 border-gray-200 bg-gray-50 text-gray-600 font-medium">
+                          +380
+                        </span>
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => {
+                            // Only allow digits
+                            const digits = e.target.value.replace(/\D/g, '').slice(0, 9);
+                            // Format as XX XXX XX XX
+                            let formatted = '';
+                            if (digits.length > 0) formatted += digits.slice(0, 2);
+                            if (digits.length > 2) formatted += ' ' + digits.slice(2, 5);
+                            if (digits.length > 5) formatted += ' ' + digits.slice(5, 7);
+                            if (digits.length > 7) formatted += ' ' + digits.slice(7, 9);
+                            setPhone(formatted);
+                          }}
+                          placeholder="66 635 18 55"
+                          className="flex-1 px-4 py-3 rounded-r-xl border border-gray-200 focus:border-gray-900 focus:ring-1 focus:ring-gray-900 outline-none transition-all"
+                        />
+                      </div>
                     </div>
 
                     {/* Booking summary */}
