@@ -170,7 +170,7 @@ function BookingSummary({
                   <Star key={i} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
-              <span className="text-gray-500">({salonReviews.toLocaleString()})</span>
+              <span className="text-blue-600">({salonReviews.toLocaleString()})</span>
             </div>
             <p className="text-xs text-gray-500 truncate mt-0.5">{salonAddress}</p>
           </div>
@@ -452,16 +452,49 @@ export function BookingModal({
     if (!canFit) {
       setSlotSelectionError(`Потрібно ${requiredSlots} слотів підряд (${roundedDuration} хв). Оберіть інший час.`);
       setSelectedTimes([]);
+
+      // On mobile, scroll to top of time slots smoothly
+      setTimeout(() => {
+        const element = timeSlotsRef.current;
+        if (element && window.innerWidth < 1024) {
+          const container = element.closest('.overflow-y-auto');
+          if (container) {
+            const targetPosition = element.offsetTop - 100;
+            const startPosition = container.scrollTop;
+            const distance = targetPosition - startPosition;
+            const duration = 500;
+            let startTime: number | null = null;
+
+            const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+            const animation = (currentTime: number) => {
+              if (startTime === null) startTime = currentTime;
+              const timeElapsed = currentTime - startTime;
+              const progress = Math.min(timeElapsed / duration, 1);
+              const easedProgress = easeOutCubic(progress);
+
+              container.scrollTop = startPosition + distance * easedProgress;
+
+              if (timeElapsed < duration) {
+                requestAnimationFrame(animation);
+              }
+            };
+
+            requestAnimationFrame(animation);
+          }
+        }
+      }, 100);
+
+      // Auto-hide error after 4 seconds
+      setTimeout(() => {
+        setSlotSelectionError(null);
+      }, 4000);
+
       return;
     }
 
-    // Animate selection
-    setSelectedTimes([]);
-    neededSlots.forEach((time, index) => {
-      setTimeout(() => {
-        setSelectedTimes(prev => [...prev, time]);
-      }, index * 100);
-    });
+    // Animate selection smoothly
+    setSelectedTimes(neededSlots);
   };
 
   const getDayName = (date: Date) => {
@@ -920,16 +953,16 @@ export function BookingModal({
                         </h2>
                       </div>
 
-                      <div className="flex gap-2 mb-6 pb-2 overflow-x-auto scrollbar-hide">
+                      <div className="flex gap-2 mb-6 pt-1 pb-2 overflow-x-auto scrollbar-hide">
                         {dates.slice(0, 14).map((date, index) => {
                           const isSelected = selectedDate?.toDateString() === date.toDateString();
                           return (
                             <button
                               key={index}
                               onClick={() => setSelectedDate(date)}
-                              className={`flex flex-col items-center min-w-[52px] py-3 px-3 rounded-full transition-all duration-200 cursor-pointer ${
+                              className={`flex flex-col items-center min-w-[52px] py-3 px-3 rounded-full transition-all duration-300 cursor-pointer ${
                                 isSelected
-                                  ? "bg-violet-500 text-white shadow-lg shadow-violet-200 scale-105"
+                                  ? "bg-violet-500 text-white shadow-lg shadow-violet-200"
                                   : "hover:bg-gray-100 active:scale-95"
                               }`}
                             >
@@ -948,16 +981,13 @@ export function BookingModal({
 
                   {/* Time slots section with ref */}
                   <div ref={timeSlotsRef}>
-                    {/* Error message - highly visible with shake animation */}
+                    {/* Error message - mobile only (inline) */}
                     {slotSelectionError && (
                       <div
-                        className="mb-4 p-4 bg-red-50 rounded-xl border-2 border-red-300 shadow-lg"
-                        style={{
-                          animation: 'fadeIn 0.3s ease-out, shake 0.5s ease-out'
-                        }}
+                        className="lg:hidden mb-4 p-4 bg-red-50 rounded-xl border-2 border-red-300 shadow-lg animate-fadeIn"
                       >
                         <p className="text-sm text-red-700 font-semibold text-center">
-                          ❌ {slotSelectionError}
+                          ⚠️ {slotSelectionError}
                         </p>
                         <p className="text-xs text-red-600 text-center mt-2">
                           Будь ласка, оберіть час так, щоб {requiredSlots} слотів підряд були вільні
@@ -989,12 +1019,12 @@ export function BookingModal({
                                 key={slot.time}
                                 onClick={() => slot.available && handleTimeSlotClick(slot.time)}
                                 disabled={!slot.available}
-                                className={`w-full p-4 rounded-xl border-2 text-center font-medium transition-all duration-200 ${
+                                className={`w-full p-4 rounded-xl border-2 text-center font-medium transition-all duration-300 ease-out ${
                                   isBooked
                                     ? "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed line-through"
                                     : isSelected
                                       ? "border-gray-900 bg-gray-900 text-white shadow-lg cursor-pointer"
-                                      : "border-gray-100 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98] cursor-pointer"
+                                      : "border-gray-100 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50 cursor-pointer"
                                 }`}
                               >
                                 <span className="flex items-center justify-center gap-2">
@@ -1247,6 +1277,33 @@ export function BookingModal({
         onCancel={() => setShowConfirmClose(false)}
         onConfirm={handleConfirmClose}
       />
+
+      {/* Desktop toast notification - bottom right */}
+      {slotSelectionError && currentStep === 2 && (
+        <div
+          className="hidden lg:block fixed bottom-6 right-6 z-[110] max-w-sm p-4 bg-white rounded-xl border border-red-200 shadow-2xl animate-slideUp"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+              <span className="text-lg">⚠️</span>
+            </div>
+            <div>
+              <p className="text-sm text-gray-900 font-semibold">
+                {slotSelectionError}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Будь ласка, оберіть час так, щоб {requiredSlots} слотів підряд були вільні
+              </p>
+            </div>
+            <button
+              onClick={() => setSlotSelectionError(null)}
+              className="w-6 h-6 rounded-full hover:bg-gray-100 flex items-center justify-center shrink-0 cursor-pointer"
+            >
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -258,7 +258,7 @@ function GalleryModal({
 
         {/* Thumbnail strip at bottom */}
         <div className="absolute bottom-4 left-0 right-0 z-20">
-          <div className="flex justify-center gap-2 px-4 overflow-x-auto">
+          <div className="flex justify-center gap-2 px-4 overflow-x-auto scrollbar-hide">
             {photos.map((photo, index) => (
               <button
                 key={index}
