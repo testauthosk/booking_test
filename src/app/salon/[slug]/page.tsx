@@ -1,117 +1,38 @@
 "use client";
 
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useParams } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
 import {
   Star,
   MapPin,
   Clock,
   ChevronRight,
-  Zap,
   Check,
   Navigation,
   X,
   ChevronLeft,
   Upload,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BookingModal } from "@/components/booking/BookingModal";
+import { getSalonBySlug } from "@/lib/api";
+import type { SalonWithRelations } from "@/types/database";
 
-// Mock data - will be replaced with real data from API
-const salonData = {
-  name: "MENSPIRE Beethoven",
-  slug: "menspire-beethoven",
-  type: "Перукарня",
-  rating: 5.0,
-  reviewCount: 1489,
-  isOpen: false,
-  opensAt: "четвер о 10:00",
-  address: "Beethovenstraat 53, Amsterdam-zuid, Amsterdam, Noord-Holland",
-  shortAddress: "Beethovenstraat 53, Amsterdam",
-  phone: "+31 20 123 4567",
-  description: "Award Winning Mens Mops Grooming. MENSPIRE presents the revolutionary transition between precision barbering and contemporary hairdressing. A fusion of technical and artistic skills with a commitment to bridge the gap between the traditional barbershop and the modern hair business.",
-  photos: [
-    "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=1200&h=800&fit=crop",
-    "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=800&h=600&fit=crop",
-    "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=800&h=600&fit=crop",
-    "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=800&h=600&fit=crop",
-    "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&h=600&fit=crop",
-    "https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?w=800&h=600&fit=crop",
-  ],
-  coordinates: {
-    lat: 52.3438,
-    lng: 4.8722,
-  },
-  workingHours: [
-    { day: "Понеділок", hours: "Зачинено", isToday: false },
-    { day: "Вівторок", hours: "10:00 - 20:00", isToday: false },
-    { day: "Середа", hours: "10:00 - 20:00", isToday: true },
-    { day: "Четвер", hours: "10:00 - 20:00", isToday: false },
-    { day: "П'ятниця", hours: "10:00 - 20:00", isToday: false },
-    { day: "Субота", hours: "09:00 - 18:00", isToday: false },
-    { day: "Неділя", hours: "09:00 - 17:00", isToday: false },
-  ],
-  amenities: [
-    "Миттєве підтвердження",
-    "Оплата на місці",
-  ],
-};
-
-const services = [
-  {
-    id: "1",
-    category: "СТРИЖКА",
-    items: [
-      { id: "1-1", name: "Стрижка чоловіча", duration: "35 хв", durationMinutes: 35, price: 450, priceFrom: true },
-      { id: "1-2", name: "Стрижка + борода", duration: "45 хв+", durationMinutes: 45, price: 650, priceFrom: true },
-      { id: "1-3", name: "Стрижка + борода + гарячий рушник", duration: "1г 15 хв", durationMinutes: 75, price: 700, priceFrom: true },
-    ],
-  },
-  {
-    id: "2",
-    category: "БОРОДА",
-    items: [
-      { id: "2-1", name: "Корекція бороди", duration: "20 хв", durationMinutes: 20, price: 250, priceFrom: true },
-      { id: "2-2", name: "Корекція бороди + гоління", duration: "30 хв", durationMinutes: 30, price: 350, priceFrom: false },
-    ],
-  },
-  {
-    id: "3",
-    category: "ГОЛІННЯ",
-    items: [
-      { id: "3-1", name: "Гоління голови", duration: "25 хв", durationMinutes: 25, price: 350, priceFrom: false },
-    ],
-  },
-];
-
-const team = [
-  { id: "1", name: "ТЕНЗІН", role: "Стиліст", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop", rating: 5.0, reviewCount: 245, price: 450 },
-  { id: "2", name: "ЛОРЕНЦО", role: "Старший стиліст", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop", rating: 4.9, reviewCount: 312, price: 500 },
-  { id: "3", name: "АРМАЛЬДО", role: "Старший стиліст", avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop", rating: 4.9, reviewCount: 189, price: 500 },
-  { id: "4", name: "КРІСТІАН", role: "Старший стиліст", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop", rating: 5.0, reviewCount: 421, price: 500 },
-  { id: "5", name: "ХАРЛІ", role: "Креативний директор", avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&h=200&fit=crop", rating: 5.0, reviewCount: 567, price: 600 },
-  { id: "6", name: "МІЛОШ", role: "Креативний директор", avatar: "https://images.unsplash.com/photo-1463453091185-61582044d556?w=200&h=200&fit=crop", rating: 4.8, reviewCount: 234, price: 600 },
-];
-
-const reviews = [
-  { id: "1", author: "Томас В", initial: "Т", color: "bg-blue-500", date: "26 лип 2024", rating: 5, text: "Завжди на висоті 🙌", service: "Стрижка чоловіча" },
-  { id: "2", author: "Герман В", initial: "Г", color: "bg-green-500", date: "17 лип 2024", rating: 5, text: "Чудово", service: "Корекція бороди" },
-  { id: "3", author: "Буріт Т", initial: "Б", color: "bg-purple-500", date: "21 лип 2024", rating: 5, text: "Топ!", service: "Стрижка чоловіча" },
-  { id: "4", author: "Маріо С", initial: "М", color: "bg-orange-500", date: "14 лип 2024", rating: 5, text: "Мілош - найкращий ❤️", service: "Стрижка + борода" },
-];
-
-// Gallery Modal Component with fullscreen view and swipe
+// Gallery Modal Component
 function GalleryModal({
   isOpen,
   onClose,
   photos,
-  initialIndex = 0
+  initialIndex = 0,
+  salonName,
 }: {
   isOpen: boolean;
   onClose: () => void;
   photos: string[];
   initialIndex?: number;
+  salonName: string;
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [fullscreenMode, setFullscreenMode] = useState(false);
@@ -121,7 +42,6 @@ function GalleryModal({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
-  // Smooth close with animation
   const handleSmoothClose = () => {
     setIsClosing(true);
     setTimeout(() => {
@@ -131,7 +51,6 @@ function GalleryModal({
     }, 300);
   };
 
-  // Minimum swipe distance
   const minSwipeDistance = 50;
 
   const goNext = () => {
@@ -158,7 +77,6 @@ function GalleryModal({
     if (isTransitioning || touchStart === null) return;
     const currentX = e.targetTouches[0].clientX;
     setTouchEnd(currentX);
-    // Visual feedback during drag
     const diff = currentX - touchStart;
     setSwipeOffset(diff * 0.4);
   };
@@ -202,7 +120,6 @@ function GalleryModal({
 
   if (!isOpen) return null;
 
-  // Fullscreen image viewer
   if (fullscreenMode) {
     return (
       <div
@@ -211,7 +128,6 @@ function GalleryModal({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* Close button */}
         <button
           onClick={() => setFullscreenMode(false)}
           className="absolute top-4 right-4 z-20 w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors cursor-pointer"
@@ -219,12 +135,10 @@ function GalleryModal({
           <X className="w-6 h-6 text-white" />
         </button>
 
-        {/* Counter */}
         <div className="absolute top-4 left-4 z-20 px-3 py-1.5 rounded-full bg-black/50 text-white text-sm font-medium">
           {currentIndex + 1} / {photos.length}
         </div>
 
-        {/* Previous button */}
         <button
           onClick={goPrev}
           className="absolute left-4 z-20 w-14 h-14 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors cursor-pointer"
@@ -232,12 +146,9 @@ function GalleryModal({
           <ChevronLeft className="w-8 h-8 text-white" />
         </button>
 
-        {/* Main image with smooth transition */}
         <div
           className="relative w-full h-full flex items-center justify-center p-4 transition-transform duration-500 ease-out"
-          style={{
-            transform: `translateX(${swipeOffset}px)`,
-          }}
+          style={{ transform: `translateX(${swipeOffset}px)` }}
         >
           <Image
             src={photos[currentIndex]}
@@ -248,7 +159,6 @@ function GalleryModal({
           />
         </div>
 
-        {/* Next button */}
         <button
           onClick={goNext}
           className="absolute right-4 z-20 w-14 h-14 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors cursor-pointer"
@@ -256,7 +166,6 @@ function GalleryModal({
           <ChevronRight className="w-8 h-8 text-white" />
         </button>
 
-        {/* Thumbnail strip at bottom */}
         <div className="absolute bottom-4 left-0 right-0 z-20">
           <div className="flex justify-center gap-2 px-4 overflow-x-auto scrollbar-hide">
             {photos.map((photo, index) => (
@@ -267,13 +176,7 @@ function GalleryModal({
                   index === currentIndex ? "ring-2 ring-white scale-110" : "opacity-60 hover:opacity-100"
                 }`}
               >
-                <Image
-                  src={photo}
-                  alt={`Міні ${index + 1}`}
-                  width={64}
-                  height={64}
-                  className="w-full h-full object-cover"
-                />
+                <Image src={photo} alt={`Міні ${index + 1}`} width={64} height={64} className="w-full h-full object-cover" />
               </button>
             ))}
           </div>
@@ -282,15 +185,13 @@ function GalleryModal({
     );
   }
 
-  // Gallery grid view
   return (
     <div className={`fixed inset-0 z-[100] bg-white ${isClosing ? 'animate-fadeOut' : 'fullpage-modal'}`}>
-      {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-10 bg-white border-b border-gray-100">
         <div className="flex items-center justify-between px-4 sm:px-6 h-14 sm:h-16">
           <div>
             <h2 className="text-base sm:text-lg font-semibold text-gray-900">Галерея зображень</h2>
-            <p className="text-xs sm:text-sm text-gray-500">{salonData.name}</p>
+            <p className="text-xs sm:text-sm text-gray-500">{salonName}</p>
           </div>
           <button
             onClick={handleSmoothClose}
@@ -301,20 +202,13 @@ function GalleryModal({
         </div>
       </div>
 
-      {/* Gallery Grid */}
       <div className="pt-16 sm:pt-20 pb-8 px-4 sm:px-6 h-full overflow-y-auto">
         <div className="max-w-6xl mx-auto">
-          {/* Main large image - clickable */}
           <div
             onClick={() => openFullscreen(0)}
             className="relative aspect-[16/10] rounded-2xl overflow-hidden mb-4 cursor-pointer group"
           >
-            <Image
-              src={photos[0]}
-              alt="Головне фото"
-              fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
-            />
+            <Image src={photos[0]} alt="Головне фото" fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
               <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full px-4 py-2 text-sm font-medium text-gray-900">
                 Відкрити
@@ -322,7 +216,6 @@ function GalleryModal({
             </div>
           </div>
 
-          {/* Grid of smaller images - clickable */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {photos.slice(1).map((photo, index) => (
               <div
@@ -330,12 +223,7 @@ function GalleryModal({
                 onClick={() => openFullscreen(index + 1)}
                 className="relative aspect-[4/3] rounded-2xl overflow-hidden cursor-pointer group"
               >
-                <Image
-                  src={photo}
-                  alt={`Фото ${index + 2}`}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                />
+                <Image src={photo} alt={`Фото ${index + 2}`} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
               </div>
             ))}
@@ -353,7 +241,36 @@ const tabs = [
   { id: "about", label: "Загальні відомості" },
 ];
 
+// Loading component
+function LoadingState() {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="w-12 h-12 animate-spin text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-500">Завантаження...</p>
+      </div>
+    </div>
+  );
+}
+
+// Not found component
+function NotFoundState() {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Салон не знайдено</h1>
+        <p className="text-gray-500">Перевірте правильність посилання</p>
+      </div>
+    </div>
+  );
+}
+
 export default function SalonPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+
+  const [salon, setSalon] = useState<SalonWithRelations | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("services");
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -363,32 +280,78 @@ export default function SalonPage() {
   const [mobilePhotoIndex, setMobilePhotoIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Refs and state for animated tab underline
   const tabsRef = useRef<(HTMLButtonElement | null)[]>([]);
   const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
   const reviewsRef = useRef<HTMLDivElement>(null);
 
-  // Swipe handlers for mobile gallery with smooth animation
+  // Load salon data
+  useEffect(() => {
+    async function loadSalon() {
+      setLoading(true);
+      const data = await getSalonBySlug(slug);
+      setSalon(data);
+      setLoading(false);
+    }
+    if (slug) {
+      loadSalon();
+    }
+  }, [slug]);
+
+  // Get current day working hours
+  const getCurrentDayInfo = () => {
+    if (!salon?.working_hours) return { isOpen: false, opensAt: '' };
+    const dayOfWeek = new Date().getDay();
+    const dayNames = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', "П'ятниця", 'Субота'];
+    const today = salon.working_hours.find((h: any) => h.day === dayNames[dayOfWeek]);
+
+    if (!today || today.hours === 'Зачинено') {
+      // Find next open day
+      for (let i = 1; i <= 7; i++) {
+        const nextDay = (dayOfWeek + i) % 7;
+        const nextDayHours = salon.working_hours.find((h: any) => h.day === dayNames[nextDay]);
+        if (nextDayHours && nextDayHours.hours !== 'Зачинено') {
+          const openTime = nextDayHours.hours.split(' - ')[0];
+          return { isOpen: false, opensAt: `${dayNames[nextDay].toLowerCase()} о ${openTime}` };
+        }
+      }
+      return { isOpen: false, opensAt: '' };
+    }
+
+    const [openTime, closeTime] = today.hours.split(' - ');
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    if (currentTime >= openTime && currentTime < closeTime) {
+      return { isOpen: true, opensAt: closeTime };
+    }
+
+    return { isOpen: false, opensAt: openTime };
+  };
+
+  const { isOpen, opensAt } = salon ? getCurrentDayInfo() : { isOpen: false, opensAt: '' };
+
+  // Mobile swipe handlers
   const minSwipeDistance = 50;
-  const [swipeOffset, setSwipeOffset] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (isTransitioning) return;
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
+
   const onTouchMove = (e: React.TouchEvent) => {
-    if (isTransitioning || touchStart === null) return;
+    if (isTransitioning || touchStart === null || !salon) return;
     const currentX = e.targetTouches[0].clientX;
     setTouchEnd(currentX);
-    // Calculate offset for visual feedback during drag
     const diff = currentX - touchStart;
-    setSwipeOffset(diff * 0.3); // Reduced for subtle effect
+    setSwipeOffset(diff * 0.3);
   };
+
   const onTouchEnd = () => {
-    if (isTransitioning || !touchStart || !touchEnd) {
+    if (isTransitioning || !touchStart || !touchEnd || !salon) {
       setSwipeOffset(0);
       return;
     }
@@ -397,53 +360,26 @@ export default function SalonPage() {
 
     if (Math.abs(distance) > minSwipeDistance) {
       setIsTransitioning(true);
+      const photos = salon.photos || [];
       if (distance > 0) {
-        setMobilePhotoIndex(prev => (prev + 1) % salonData.photos.length);
+        setMobilePhotoIndex(prev => (prev + 1) % photos.length);
       } else {
-        setMobilePhotoIndex(prev => (prev - 1 + salonData.photos.length) % salonData.photos.length);
+        setMobilePhotoIndex(prev => (prev - 1 + photos.length) % photos.length);
       }
-      // Reset transition state after animation
       setTimeout(() => setIsTransitioning(false), 500);
     }
   };
 
-  // Smooth scroll to top on page load/refresh
-  useEffect(() => {
-    if (window.scrollY > 0) {
-      const startPosition = window.scrollY;
-      const duration = 600;
-      let startTime: number | null = null;
-
-      const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
-      const animation = (currentTime: number) => {
-        if (startTime === null) startTime = currentTime;
-        const timeElapsed = currentTime - startTime;
-        const progress = Math.min(timeElapsed / duration, 1);
-        const easedProgress = easeOutCubic(progress);
-
-        window.scrollTo(0, startPosition * (1 - easedProgress));
-
-        if (timeElapsed < duration) {
-          requestAnimationFrame(animation);
-        }
-      };
-
-      requestAnimationFrame(animation);
-    }
-  }, []);
-
-  // Scroll to reviews - smooth and slow
+  // Scroll to reviews
   const scrollToReviews = () => {
     setActiveTab("reviews");
     setTimeout(() => {
-      // Custom smooth scroll with easing
       const element = reviewsRef.current;
       if (element) {
         const targetPosition = element.getBoundingClientRect().top + window.pageYOffset - 100;
         const startPosition = window.pageYOffset;
         const distance = targetPosition - startPosition;
-        const duration = 800; // Longer duration for smoother feel
+        const duration = 800;
         let startTime: number | null = null;
 
         const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -466,7 +402,7 @@ export default function SalonPage() {
     }, 150);
   };
 
-  // Update underline position when active tab changes
+  // Update underline position
   useLayoutEffect(() => {
     const activeIndex = tabs.findIndex(tab => tab.id === activeTab);
     const activeTabEl = tabsRef.current[activeIndex];
@@ -478,7 +414,7 @@ export default function SalonPage() {
     }
   }, [activeTab]);
 
-  // Track scroll for sidebar animation - triggers when name/rating header is scrolled past
+  // Track scroll
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 120);
@@ -492,86 +428,92 @@ export default function SalonPage() {
     setGalleryOpen(true);
   };
 
+  // Loading and error states
+  if (loading) return <LoadingState />;
+  if (!salon) return <NotFoundState />;
+
+  // Prepare data
+  const photos = salon.photos && salon.photos.length > 0
+    ? salon.photos
+    : ['https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&h=600&fit=crop'];
+
+  const workingHoursWithToday = (salon.working_hours || []).map((item: any) => {
+    const dayOfWeek = new Date().getDay();
+    const dayNames = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', "П'ятниця", 'Субота'];
+    return {
+      ...item,
+      isToday: item.day === dayNames[dayOfWeek]
+    };
+  });
+
+  const services = salon.services || [];
+  const masters = salon.masters || [];
+  const reviews = salon.reviews || [];
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation - Simplified for business card */}
+      {/* Navigation */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo - no link for demo */}
             <div className="flex items-center">
               <span className="text-2xl font-bold tracking-tight text-gray-900">booking</span>
             </div>
-
-            {/* Right Actions - Hidden for now */}
-            <div className="flex items-center gap-3">
-              {/* Will be enabled later for marketplace */}
-            </div>
+            <div className="flex items-center gap-3"></div>
           </div>
         </div>
       </header>
 
-      {/* Main Content - pb-24 for mobile bottom bar */}
+      {/* Main Content */}
       <main className="pb-24 lg:pb-0">
-        {/* Hero Section - Name, Rating, Share ABOVE Gallery */}
+        {/* Hero Section */}
         <div className="bg-white border-b border-gray-100">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                {/* Salon Name - 44px like Fresha */}
                 <h1 className="text-[32px] lg:text-[44px] font-bold text-gray-900 mb-3 leading-tight">
-                  {salonData.name}
+                  {salon.name}
                 </h1>
 
-                {/* Rating & Info Row */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-base">
-                  {/* Rating */}
                   <div className="flex items-center gap-2">
                     <div className="flex gap-0.5">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className="w-5 h-5 fill-amber-400 text-amber-400"
-                        />
+                        <Star key={star} className="w-5 h-5 fill-amber-400 text-amber-400" />
                       ))}
                     </div>
-                    <span className="font-semibold text-gray-900 text-lg">{salonData.rating}</span>
+                    <span className="font-semibold text-gray-900 text-lg">{salon.rating}</span>
                     <button
                       onClick={scrollToReviews}
                       className="text-blue-600 hover:text-blue-700 hover:underline cursor-pointer transition-colors"
                     >
-                      ({salonData.reviewCount.toLocaleString()} відгуків)
+                      ({salon.review_count?.toLocaleString() || 0} відгуків)
                     </button>
                   </div>
 
                   <span className="text-gray-300 text-lg">•</span>
-
-                  {/* Type */}
-                  <span className="text-gray-600">{salonData.type}</span>
-
+                  <span className="text-gray-600">{salon.type}</span>
                   <span className="text-gray-300 text-lg">•</span>
 
-                  {/* Status */}
                   <div className="flex items-center gap-1.5">
-                    {salonData.isOpen ? (
+                    {isOpen ? (
                       <span className="text-green-600 font-medium">Відчинено</span>
                     ) : (
                       <>
                         <span className="text-red-500 font-medium">Зачинено</span>
-                        <span className="text-gray-500">— відчиниться о {salonData.opensAt.replace('четвер о ', '')}</span>
+                        {opensAt && <span className="text-gray-500">— відчиниться {opensAt}</span>}
                       </>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Share Button - aligned with rating row */}
               <button
                 onClick={() => {
                   if (navigator.share) {
                     navigator.share({
-                      title: salonData.name,
-                      text: `${salonData.name} - ${salonData.type}`,
+                      title: salon.name,
+                      text: `${salon.name} - ${salon.type}`,
                       url: window.location.href,
                     });
                   } else {
@@ -601,44 +543,31 @@ export default function SalonPage() {
               >
                 <div
                   className="absolute inset-0 transition-all duration-500 ease-out"
-                  style={{
-                    transform: `translateX(${swipeOffset}px)`,
-                  }}
+                  style={{ transform: `translateX(${swipeOffset}px)` }}
                 >
                   <Image
-                    src={salonData.photos[mobilePhotoIndex]}
-                    alt={salonData.name}
+                    src={photos[mobilePhotoIndex]}
+                    alt={salon.name}
                     fill
                     className="object-cover transition-all duration-500 ease-out"
                     priority
                   />
                 </div>
-                {/* Dot indicators */}
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                  {salonData.photos.map((_, index) => (
+                  {photos.map((_, index) => (
                     <button
                       key={index}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMobilePhotoIndex(index);
-                      }}
-                      className={`w-2 h-2 rounded-full transition-all ${
-                        index === mobilePhotoIndex ? "bg-white w-6" : "bg-white/50"
-                      }`}
+                      onClick={(e) => { e.stopPropagation(); setMobilePhotoIndex(index); }}
+                      className={`w-2 h-2 rounded-full transition-all ${index === mobilePhotoIndex ? "bg-white w-6" : "bg-white/50"}`}
                     />
                   ))}
                 </div>
-                {/* Counter */}
                 <div className="absolute top-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-                  {mobilePhotoIndex + 1} / {salonData.photos.length}
+                  {mobilePhotoIndex + 1} / {photos.length}
                 </div>
-                {/* View all button */}
                 <button
                   className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm text-gray-900 px-3 py-2 rounded-full text-sm font-medium flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openGallery(0);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); openGallery(0); }}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -648,27 +577,14 @@ export default function SalonPage() {
               </div>
             </div>
 
-            {/* Desktop Gallery - Fresha Style: 1 large + 2 small stacked */}
+            {/* Desktop Gallery */}
             <div className="hidden lg:grid lg:grid-cols-[1fr_0.4fr] gap-2 h-[420px]">
-              {/* Large Image */}
-              <div
-                className="relative rounded-xl overflow-hidden bg-gray-100 cursor-pointer group"
-                onClick={() => openGallery(0)}
-              >
-                <Image
-                  src={salonData.photos[0]}
-                  alt={salonData.name}
-                  fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  priority
-                />
+              <div className="relative rounded-xl overflow-hidden bg-gray-100 cursor-pointer group" onClick={() => openGallery(0)}>
+                <Image src={photos[0]} alt={salon.name} fill className="object-cover transition-transform duration-500 group-hover:scale-105" priority />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
                 <button
                   className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm text-gray-900 px-4 py-2.5 rounded-full text-sm font-medium hover:bg-white transition-all duration-200 flex items-center gap-2 shadow-sm cursor-pointer active:scale-95"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openGallery(0);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); openGallery(0); }}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -677,32 +593,19 @@ export default function SalonPage() {
                 </button>
               </div>
 
-              {/* Small Images Stack */}
               <div className="grid grid-rows-2 gap-2">
-                <div
-                  className="relative rounded-xl overflow-hidden bg-gray-100 cursor-pointer group"
-                  onClick={() => openGallery(1)}
-                >
-                  <Image
-                    src={salonData.photos[1]}
-                    alt={`${salonData.name} інтер'єр`}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
-                </div>
-                <div
-                  className="relative rounded-xl overflow-hidden bg-gray-100 cursor-pointer group"
-                  onClick={() => openGallery(2)}
-                >
-                  <Image
-                    src={salonData.photos[2]}
-                    alt={`${salonData.name} деталі`}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
-                </div>
+                {photos[1] && (
+                  <div className="relative rounded-xl overflow-hidden bg-gray-100 cursor-pointer group" onClick={() => openGallery(1)}>
+                    <Image src={photos[1]} alt={`${salon.name} інтер'єр`} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                  </div>
+                )}
+                {photos[2] && (
+                  <div className="relative rounded-xl overflow-hidden bg-gray-100 cursor-pointer group" onClick={() => openGallery(2)}>
+                    <Image src={photos[2]} alt={`${salon.name} деталі`} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -711,16 +614,16 @@ export default function SalonPage() {
         {/* Content Section */}
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 lg:gap-10">
-            {/* Left Column - Main Content */}
+            {/* Left Column */}
             <div>
-              {/* Address Row - Below Gallery */}
+              {/* Address Row */}
               <div className="flex flex-wrap items-center gap-3 mb-6 pb-6 border-b border-gray-100">
                 <div className="flex items-center gap-2 text-gray-600">
                   <MapPin className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm">{salonData.shortAddress}</span>
+                  <span className="text-sm">{salon.short_address || salon.address}</span>
                 </div>
                 <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${salonData.coordinates.lat},${salonData.coordinates.lng}`}
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${salon.coordinates_lat},${salon.coordinates_lng}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition-all duration-200 cursor-pointer active:scale-95"
@@ -739,21 +642,15 @@ export default function SalonPage() {
                       ref={(el) => { tabsRef.current[index] = el; }}
                       onClick={() => setActiveTab(tab.id)}
                       className={`pb-4 text-sm font-medium transition-colors cursor-pointer ${
-                        activeTab === tab.id
-                          ? "text-gray-900"
-                          : "text-gray-500 hover:text-gray-700"
+                        activeTab === tab.id ? "text-gray-900" : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
                       {tab.label}
                     </button>
                   ))}
-                  {/* Animated underline */}
                   <div
                     className="absolute bottom-0 h-0.5 bg-gray-900 transition-all duration-300 ease-out"
-                    style={{
-                      left: underlineStyle.left,
-                      width: underlineStyle.width,
-                    }}
+                    style={{ left: underlineStyle.left, width: underlineStyle.width }}
                   />
                 </nav>
               </div>
@@ -764,13 +661,13 @@ export default function SalonPage() {
                   <h2 className="text-xl font-bold text-gray-900 mb-6">Послуги</h2>
 
                   <div className="space-y-8">
-                    {services.map((category) => (
+                    {services.map((category: any) => (
                       <div key={category.id}>
                         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-                          {category.category}
+                          {category.name}
                         </h3>
                         <div className="space-y-3">
-                          {category.items.map((service) => (
+                          {category.items?.map((service: any) => (
                             <div
                               key={service.id}
                               onClick={() => setBookingOpen(true)}
@@ -778,22 +675,15 @@ export default function SalonPage() {
                             >
                               <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-semibold text-gray-900 mb-1">
-                                    {service.name}
-                                  </h4>
-                                  <p className="text-sm text-gray-500 mb-2">
-                                    {service.duration}
-                                  </p>
+                                  <h4 className="font-semibold text-gray-900 mb-1">{service.name}</h4>
+                                  <p className="text-sm text-gray-500 mb-2">{service.duration}</p>
                                   <p className="text-sm font-medium text-gray-900">
-                                    {service.priceFrom && <span className="text-gray-500 font-normal">від </span>}
+                                    {service.price_from && <span className="text-gray-500 font-normal">від </span>}
                                     {service.price} ₴
                                   </p>
                                 </div>
                                 <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setBookingOpen(true);
-                                  }}
+                                  onClick={(e) => { e.stopPropagation(); setBookingOpen(true); }}
                                   className="bg-gray-900 hover:bg-gray-800 active:scale-95 text-white rounded-full px-6 h-10 font-medium shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer"
                                 >
                                   Забронювати
@@ -806,13 +696,15 @@ export default function SalonPage() {
                     ))}
                   </div>
 
-                  <button
-                    onClick={() => setBookingOpen(true)}
-                    className="mt-6 text-gray-900 font-medium hover:underline flex items-center gap-1 cursor-pointer transition-colors hover:text-gray-600"
-                  >
-                    Дивитись усі послуги
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  {services.length > 0 && (
+                    <button
+                      onClick={() => setBookingOpen(true)}
+                      className="mt-6 text-gray-900 font-medium hover:underline flex items-center gap-1 cursor-pointer transition-colors hover:text-gray-600"
+                    >
+                      Дивитись усі послуги
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </section>
               )}
 
@@ -822,31 +714,25 @@ export default function SalonPage() {
                   <h2 className="text-xl font-bold text-gray-900 mb-6">Команда</h2>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                    {team.map((member) => (
-                      <div
-                        key={member.id}
-                        className="group cursor-pointer"
-                      >
+                    {masters.map((member: any) => (
+                      <div key={member.id} className="group cursor-pointer">
                         <div className="relative mb-3">
                           <div className="w-full aspect-square rounded-2xl overflow-hidden bg-gray-100">
                             <Image
-                              src={member.avatar}
+                              src={member.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop'}
                               alt={member.name}
                               width={200}
                               height={200}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
                           </div>
-                          {/* Rating Badge */}
                           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white rounded-full px-2.5 py-1 shadow-md flex items-center gap-1">
                             <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                             <span className="text-xs font-semibold text-gray-900">{member.rating}</span>
                           </div>
                         </div>
                         <div className="text-center pt-2">
-                          <h4 className="font-semibold text-gray-900 text-sm">
-                            {member.name}
-                          </h4>
+                          <h4 className="font-semibold text-gray-900 text-sm">{member.name}</h4>
                           <p className="text-xs text-gray-500 mt-0.5">{member.role}</p>
                         </div>
                       </div>
@@ -860,56 +746,48 @@ export default function SalonPage() {
                 <section ref={reviewsRef} className="animate-fadeIn">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Відгуки</h2>
 
-                  {/* Rating Summary - Compact like Fresha */}
                   <div className="flex items-center gap-2 mb-6">
                     <div className="flex">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className="w-6 h-6 fill-yellow-400 text-yellow-400"
-                        />
+                        <Star key={star} className="w-6 h-6 fill-yellow-400 text-yellow-400" />
                       ))}
                     </div>
-                    <span className="text-lg font-semibold text-gray-900">{salonData.rating.toFixed(1).replace('.', ',')}</span>
-                    <span className="text-blue-600">({salonData.reviewCount.toLocaleString().replace(',', ' ')} відгуків)</span>
+                    <span className="text-lg font-semibold text-gray-900">{Number(salon.rating).toFixed(1).replace('.', ',')}</span>
+                    <span className="text-blue-600">({salon.review_count?.toLocaleString() || 0} відгуків)</span>
                   </div>
 
-                  {/* Reviews Grid - 2 columns like Fresha */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                    {reviews.map((review) => (
+                    {reviews.map((review: any) => (
                       <div key={review.id} className="border-b border-gray-100 pb-5">
-                        {/* Author row */}
                         <div className="flex items-center gap-3 mb-2">
-                          <div className={`w-9 h-9 rounded-full ${review.color} flex items-center justify-center text-white font-semibold text-sm`}>
-                            {review.initial}
+                          <div className={`w-9 h-9 rounded-full ${review.author_color || 'bg-blue-500'} flex items-center justify-center text-white font-semibold text-sm`}>
+                            {review.author_initial}
                           </div>
                           <div>
-                            <h4 className="font-semibold text-gray-900 text-sm leading-tight">
-                              {review.author}
-                            </h4>
+                            <h4 className="font-semibold text-gray-900 text-sm leading-tight">{review.author_name}</h4>
                             <span className="text-xs text-gray-400">
-                              {review.date}
+                              {new Date(review.created_at).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </div>
                         </div>
-                        {/* Stars */}
                         <div className="flex mb-2">
                           {[1, 2, 3, 4, 5].map((star) => (
                             <Star
                               key={star}
-                              className="w-4 h-4 fill-yellow-400 text-yellow-400"
+                              className={`w-4 h-4 ${star <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200'}`}
                             />
                           ))}
                         </div>
-                        {/* Review text */}
                         <p className="text-sm text-gray-700">{review.text}</p>
                       </div>
                     ))}
                   </div>
 
-                  <button className="mt-6 px-6 py-2.5 border border-gray-200 rounded-full text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer">
-                    Посмотреть все
-                  </button>
+                  {reviews.length > 0 && (
+                    <button className="mt-6 px-6 py-2.5 border border-gray-200 rounded-full text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors cursor-pointer">
+                      Дивитись усі
+                    </button>
+                  )}
                 </section>
               )}
 
@@ -918,15 +796,15 @@ export default function SalonPage() {
                 <section className="animate-fadeIn">
                   <h2 className="text-xl font-bold text-gray-900 mb-6">Загальні відомості</h2>
 
-                  <p className="text-gray-600 leading-relaxed mb-8">
-                    {salonData.description}
-                  </p>
+                  {salon.description && (
+                    <p className="text-gray-600 leading-relaxed mb-8">{salon.description}</p>
+                  )}
 
                   {/* Map */}
                   <div className="rounded-2xl overflow-hidden mb-6 border border-gray-100">
                     <div className="aspect-[16/9] bg-gray-100 relative">
                       <iframe
-                        src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2437.3!2d${salonData.coordinates.lng}!3d${salonData.coordinates.lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNTLCsDIwJzM3LjciTiA0wrA1MicyMC4wIkU!5e0!3m2!1sen!2s!4v1234567890`}
+                        src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2437.3!2d${salon.coordinates_lng}!3d${salon.coordinates_lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNTLCsDIwJzM3LjciTiA0wrA1MicyMC4wIkU!5e0!3m2!1sen!2s!4v1234567890`}
                         className="w-full h-full border-0"
                         allowFullScreen
                         loading="lazy"
@@ -938,9 +816,9 @@ export default function SalonPage() {
                   <div className="flex items-start gap-3 mb-6">
                     <MapPin className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-gray-900 font-medium">{salonData.address}</p>
+                      <p className="text-gray-900 font-medium">{salon.address}</p>
                       <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${salonData.coordinates.lat},${salonData.coordinates.lng}`}
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${salon.coordinates_lat},${salon.coordinates_lng}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm text-gray-600 hover:text-gray-900 font-medium"
@@ -950,25 +828,20 @@ export default function SalonPage() {
                     </div>
                   </div>
 
-                  {/* Working Hours - Fresha style */}
+                  {/* Working Hours */}
                   <div className="bg-white rounded-2xl p-6 border border-gray-100 mb-6">
                     <h3 className="font-semibold text-gray-900 mb-5 flex items-center gap-2">
                       <Clock className="w-5 h-5 text-gray-400" />
                       Час роботи
                     </h3>
                     <div className="space-y-4">
-                      {salonData.workingHours.map((item) => (
-                        <div
-                          key={item.day}
-                          className="flex items-center justify-between"
-                        >
+                      {workingHoursWithToday.map((item: any) => (
+                        <div key={item.day} className="flex items-center justify-between">
                           <div className="flex items-center gap-1">
                             <span className={`text-sm ${item.isToday ? "font-semibold text-gray-900" : "text-gray-700"}`}>
                               {item.day}
                             </span>
-                            {item.isToday && (
-                              <span className="text-sm text-green-600 font-medium">(сьогодні)</span>
-                            )}
+                            {item.isToday && <span className="text-sm text-green-600 font-medium">(сьогодні)</span>}
                           </div>
                           <span className={`text-sm ${item.hours === "Зачинено" ? "text-gray-400" : item.isToday ? "font-semibold text-gray-900" : "text-gray-700"}`}>
                             {item.hours}
@@ -979,52 +852,46 @@ export default function SalonPage() {
                   </div>
 
                   {/* Amenities */}
-                  <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                    <h3 className="font-semibold text-gray-900 mb-4">Додаткова інформація</h3>
-                    <div className="space-y-3">
-                      {salonData.amenities.map((amenity, i) => (
-                        <div key={i} className="flex items-center gap-3 text-sm">
-                          <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
-                            <Check className="w-3 h-3 text-gray-600" />
+                  {salon.amenities && salon.amenities.length > 0 && (
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100">
+                      <h3 className="font-semibold text-gray-900 mb-4">Додаткова інформація</h3>
+                      <div className="space-y-3">
+                        {salon.amenities.map((amenity: string, i: number) => (
+                          <div key={i} className="flex items-center gap-3 text-sm">
+                            <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
+                              <Check className="w-3 h-3 text-gray-600" />
+                            </div>
+                            <span className="text-gray-600">{amenity}</span>
                           </div>
-                          <span className="text-gray-600">{amenity}</span>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </section>
               )}
             </div>
 
-            {/* Right Column - Sticky Sidebar Fresha Style */}
+            {/* Right Column - Sticky Sidebar */}
             <div className="hidden lg:block">
               <div className="sticky top-24">
-                {/* Main Booking Card */}
                 <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                  {/* Header - shows name/rating when scrolled (Fresha style) */}
-                  <div className={`overflow-hidden transition-all duration-300 ease-out ${
-                    isScrolled ? "max-h-[170px] opacity-100" : "max-h-0 opacity-0"
-                  }`}>
+                  <div className={`overflow-hidden transition-all duration-300 ease-out ${isScrolled ? "max-h-[170px] opacity-100" : "max-h-0 opacity-0"}`}>
                     <div className="px-5 pt-5 space-y-2 pb-4 border-b border-gray-200 h-[121px]">
-                      {/* Name - 44px bold like Fresha */}
-                      <h3 className="font-bold text-gray-900 text-[28px] leading-tight">{salonData.name}</h3>
-
-                      {/* Rating row - Fresha style: 5,0 + stars + (count) */}
+                      <h3 className="font-bold text-gray-900 text-[28px] leading-tight">{salon.name}</h3>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-gray-900 text-lg">{salonData.rating.toFixed(1).replace('.', ',')}</span>
+                        <span className="font-semibold text-gray-900 text-lg">{Number(salon.rating).toFixed(1).replace('.', ',')}</span>
                         <div className="flex gap-0.5">
                           {[1, 2, 3, 4, 5].map((star) => (
                             <Star key={star} className="w-4 h-4 fill-amber-400 text-amber-400" />
                           ))}
                         </div>
                         <button onClick={scrollToReviews} className="text-blue-600 font-medium text-base hover:underline cursor-pointer">
-                          ({salonData.reviewCount.toLocaleString().replace(',', ' ')} відгуків)
+                          ({salon.review_count?.toLocaleString() || 0} відгуків)
                         </button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Booking Button */}
                   <div className={`px-5 transition-all duration-300 ${isScrolled ? "pt-4" : "pt-5"}`}>
                     <Button
                       onClick={() => setBookingOpen(true)}
@@ -1034,50 +901,34 @@ export default function SalonPage() {
                     </Button>
                   </div>
 
-                  {/* Info Section */}
                   <div className="p-5 space-y-3">
-                    {/* Status with expandable schedule */}
                     <div>
                       <button
                         onClick={() => setScheduleOpen(!scheduleOpen)}
                         className="flex items-center gap-3 w-full text-left cursor-pointer"
                       >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                          salonData.isOpen ? "bg-green-50" : "bg-red-50"
-                        }`}>
-                          <Clock className={`w-5 h-5 ${
-                            salonData.isOpen ? "text-green-600" : "text-red-500"
-                          }`} />
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isOpen ? "bg-green-50" : "bg-red-50"}`}>
+                          <Clock className={`w-5 h-5 ${isOpen ? "text-green-600" : "text-red-500"}`} />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-1">
-                            <span className={`font-medium ${salonData.isOpen ? "text-green-600" : "text-red-500"}`}>
-                              {salonData.isOpen ? "Відчинено" : "Зачинено"}
+                            <span className={`font-medium ${isOpen ? "text-green-600" : "text-red-500"}`}>
+                              {isOpen ? "Відчинено" : "Зачинено"}
                             </span>
                             <span className="text-gray-600">
-                              {salonData.isOpen ? `до 20:00` : `о ${salonData.opensAt.replace('четвер о ', '')}`}
+                              {isOpen ? `до ${opensAt}` : opensAt ? `о ${opensAt.split(' о ')[1] || opensAt}` : ''}
                             </span>
                             <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${scheduleOpen ? "rotate-90" : ""}`} />
                           </div>
                         </div>
                       </button>
 
-                      {/* Expandable schedule */}
-                      <div className={`overflow-hidden transition-all duration-300 ease-out ${
-                        scheduleOpen ? "max-h-[300px] opacity-100 mt-3" : "max-h-0 opacity-0"
-                      }`}>
+                      <div className={`overflow-hidden transition-all duration-300 ease-out ${scheduleOpen ? "max-h-[300px] opacity-100 mt-3" : "max-h-0 opacity-0"}`}>
                         <div className="pl-[52px] space-y-2">
-                          {salonData.workingHours.map((item) => (
-                            <div
-                              key={item.day}
-                              className={`flex items-center gap-3 text-sm ${item.isToday ? "font-medium" : ""}`}
-                            >
-                              <div className={`w-2 h-2 rounded-full ${
-                                item.hours === "Зачинено" ? "bg-gray-300" : "bg-green-500"
-                              }`} />
-                              <span className={`flex-1 ${item.isToday ? "text-gray-900" : "text-gray-600"}`}>
-                                {item.day}
-                              </span>
+                          {workingHoursWithToday.map((item: any) => (
+                            <div key={item.day} className={`flex items-center gap-3 text-sm ${item.isToday ? "font-medium" : ""}`}>
+                              <div className={`w-2 h-2 rounded-full ${item.hours === "Зачинено" ? "bg-gray-300" : "bg-green-500"}`} />
+                              <span className={`flex-1 ${item.isToday ? "text-gray-900" : "text-gray-600"}`}>{item.day}</span>
                               <span className={`${item.isToday ? "text-gray-900 font-semibold" : item.hours === "Зачинено" ? "text-gray-400" : "text-gray-600"}`}>
                                 {item.hours}
                               </span>
@@ -1087,17 +938,14 @@ export default function SalonPage() {
                       </div>
                     </div>
 
-                    {/* Location */}
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center shrink-0">
                         <MapPin className="w-5 h-5 text-gray-400" />
                       </div>
                       <div className="flex-1 min-w-0 pt-0.5">
-                        <p className="text-gray-700 text-sm leading-relaxed">
-                          {salonData.address}
-                        </p>
+                        <p className="text-gray-700 text-sm leading-relaxed">{salon.address}</p>
                         <a
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${salonData.coordinates.lat},${salonData.coordinates.lng}`}
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${salon.coordinates_lat},${salon.coordinates_lng}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-600 font-medium text-sm hover:underline inline-flex items-center gap-1 mt-1.5 transition-colors"
@@ -1108,7 +956,6 @@ export default function SalonPage() {
                       </div>
                     </div>
                   </div>
-
                 </div>
               </div>
             </div>
@@ -1130,36 +977,38 @@ export default function SalonPage() {
       <GalleryModal
         isOpen={galleryOpen}
         onClose={() => setGalleryOpen(false)}
-        photos={salonData.photos}
+        photos={photos}
         initialIndex={galleryIndex}
+        salonName={salon.name}
       />
 
       {/* Booking Modal */}
       <BookingModal
         isOpen={bookingOpen}
         onClose={() => setBookingOpen(false)}
-        salonName={salonData.name}
-        salonImage={salonData.photos[0]}
-        salonRating={salonData.rating}
-        salonReviews={salonData.reviewCount}
-        salonAddress={salonData.shortAddress}
-        services={services.map(cat => ({
-          category: cat.category,
-          items: cat.items.map(item => ({
+        salonId={salon.id}
+        salonName={salon.name}
+        salonImage={photos[0]}
+        salonRating={Number(salon.rating)}
+        salonReviews={salon.review_count || 0}
+        salonAddress={salon.short_address || salon.address || ''}
+        services={services.map((cat: any) => ({
+          category: cat.name,
+          items: (cat.items || []).map((item: any) => ({
             id: item.id,
             name: item.name,
             duration: item.duration,
-            durationMinutes: item.durationMinutes,
+            durationMinutes: item.duration_minutes,
             price: item.price,
           }))
         }))}
-        specialists={team.map(member => ({
+        specialists={masters.map((member: any) => ({
           id: member.id,
           name: member.name,
           role: member.role,
-          avatar: member.avatar,
+          avatar: member.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop',
           rating: member.rating,
-          reviewCount: member.reviewCount,
+          reviewCount: member.review_count,
           price: member.price,
         }))}
       />

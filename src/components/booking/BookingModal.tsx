@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { X, ChevronLeft, ChevronRight, Star, Check, Plus, Calendar, Clock, User, Send } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Star, Check, Plus, Calendar, Clock, User, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
+import { createBooking, getAvailableSlots } from "@/lib/api";
 
 // Types
 interface Service {
@@ -34,6 +36,7 @@ interface TimeSlot {
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
+  salonId: string;
   salonName: string;
   salonImage: string;
   salonRating: number;
@@ -284,6 +287,7 @@ function ConfirmCloseDialog({
 export function BookingModal({
   isOpen,
   onClose,
+  salonId,
   salonName,
   salonImage,
   salonRating,
@@ -308,6 +312,8 @@ export function BookingModal({
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [isClosing, setIsClosing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const steps = ["Послуги", "Фахівець", "Час", "Підтвердження", "Готово"];
 
@@ -344,40 +350,55 @@ export function BookingModal({
     return dates;
   };
 
-  // Generate time slots with test booked data
-  const generateTimeSlots = (date: Date): TimeSlot[] => {
-    const slots: TimeSlot[] = [];
-    const times = [
+  // Fetch available time slots from database
+  const fetchTimeSlots = async (date: Date, masterId: string | null): Promise<TimeSlot[]> => {
+    const dateStr = date.toISOString().split('T')[0];
+
+    // Get all time slots for the day
+    const allTimes = [
       "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
       "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
       "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
       "18:00", "18:30", "19:00"
     ];
 
-    // Test data: some booked slots for each day
-    const bookedSlots: Record<number, string[]> = {
-      0: ["10:00", "10:30", "14:00", "14:30", "15:00"],
-      1: ["09:30", "10:00", "11:00", "11:30", "16:00"],
-      2: ["12:00", "12:30", "13:00", "17:00", "17:30"],
-      3: ["09:00", "09:30", "15:00", "15:30", "18:00"],
-      4: ["10:30", "11:00", "11:30", "14:00", "19:00"],
-      5: ["13:00", "13:30", "14:00", "14:30", "16:30"],
-      6: ["09:00", "10:00", "12:00", "15:00", "18:30"],
-    };
+    // Get blocked/booked slots from database
+    let query = supabase
+      .from('schedule')
+      .select('time_start, time_end')
+      .eq('salon_id', salonId)
+      .eq('date', dateStr)
+      .eq('is_blocked', true);
 
-    const dayOfWeek = date.getDay();
-    const todayBooked = bookedSlots[dayOfWeek] || [];
+    if (masterId && masterId !== 'any') {
+      query = query.eq('master_id', masterId);
+    }
 
-    times.forEach(time => {
-      const isBooked = todayBooked.includes(time);
-      slots.push({
-        time,
-        available: !isBooked,
-        booked: isBooked
+    const { data: blockedSlots } = await query;
+
+    // Build set of blocked times
+    const blockedTimes = new Set<string>();
+    if (blockedSlots) {
+      blockedSlots.forEach(slot => {
+        // Mark all 30-minute slots between start and end as blocked
+        let current = slot.time_start;
+        while (current < slot.time_end) {
+          blockedTimes.add(current);
+          // Add 30 minutes
+          const [hours, mins] = current.split(':').map(Number);
+          const totalMins = hours * 60 + mins + 30;
+          const newHours = Math.floor(totalMins / 60);
+          const newMins = totalMins % 60;
+          current = `${newHours.toString().padStart(2, '0')}:${newMins.toString().padStart(2, '0')}`;
+        }
       });
-    });
+    }
 
-    return slots;
+    return allTimes.map(time => ({
+      time,
+      available: !blockedTimes.has(time),
+      booked: blockedTimes.has(time)
+    }));
   };
 
   const dates = generateDates();
@@ -387,9 +408,15 @@ export function BookingModal({
 
   useEffect(() => {
     if (selectedDate) {
-      setTimeSlots(generateTimeSlots(selectedDate));
+      setLoadingSlots(true);
       setSelectedTimes([]);
       setSlotSelectionError(null);
+
+      fetchTimeSlots(selectedDate, selectedSpecialist).then(slots => {
+        setTimeSlots(slots);
+        setLoadingSlots(false);
+      });
+
       // Auto-scroll to time slots after date selection - smooth custom animation
       setTimeout(() => {
         const element = timeSlotsRef.current;
@@ -537,8 +564,40 @@ export function BookingModal({
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < steps.length - 1 && canProceed()) {
+      // If we're on confirmation step (step 3), submit the booking
+      if (currentStep === 3) {
+        setIsSubmitting(true);
+        try {
+          const booking = await createBooking({
+            salon_id: salonId,
+            service_id: selectedServices[0], // Primary service
+            master_id: selectedSpecialist === 'any' ? specialists[0]?.id : selectedSpecialist!,
+            client_name: `${firstName} ${lastName}`,
+            client_phone: `+380${phone.replace(/\s/g, '')}`,
+            date: selectedDate!.toISOString().split('T')[0],
+            time: selectedTimes[0],
+            duration_minutes: roundedDuration,
+            status: 'pending',
+            price: selectedServiceItems.reduce((sum, s) => sum + s.price, 0),
+            notes: selectedServices.length > 1
+              ? `Додаткові послуги: ${selectedServiceItems.slice(1).map(s => s.name).join(', ')}`
+              : undefined,
+          });
+
+          if (!booking) {
+            throw new Error('Помилка створення бронювання');
+          }
+        } catch (error) {
+          console.error('Booking error:', error);
+          alert('Помилка при створенні бронювання. Спробуйте ще раз.');
+          setIsSubmitting(false);
+          return;
+        }
+        setIsSubmitting(false);
+      }
+
       setCompletedSteps(prev => [...prev.filter(s => s !== currentStep), currentStep]);
       setCurrentStep(prev => prev + 1);
     }
@@ -1015,11 +1074,16 @@ export function BookingModal({
                         </div>
                         <p className="text-gray-500 font-medium">Оберіть дату щоб побачити доступний час</p>
                       </div>
+                    ) : loadingSlots ? (
+                      <div className="text-center py-12">
+                        <Loader2 className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500 font-medium">Завантаження...</p>
+                      </div>
                     ) : (
                       <div className="space-y-2">
                         {timeSlots.length === 0 ? (
                           <div className="text-center py-12">
-                            <p className="text-gray-500 font-medium">Завантаження...</p>
+                            <p className="text-gray-500 font-medium">Немає доступних слотів</p>
                           </div>
                         ) : (
                           timeSlots.map(slot => {
@@ -1237,10 +1301,12 @@ export function BookingModal({
               {currentStep < steps.length - 1 && (
                 <Button
                   onClick={handleNext}
-                  disabled={!canProceed()}
+                  disabled={!canProceed() || isSubmitting}
                   className="mt-4 w-full bg-gray-900 hover:bg-gray-800 text-white rounded-full px-8 h-12 font-semibold transition-all duration-200 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100 cursor-pointer"
                 >
-                  {currentStep === 3 ? "Підтвердити бронювання" : "Продовжити"}
+                  {isSubmitting ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : currentStep === 3 ? "Підтвердити бронювання" : "Продовжити"}
                 </Button>
               )}
 
@@ -1262,10 +1328,12 @@ export function BookingModal({
           <div className="lg:hidden px-4 sm:px-6 py-4 border-t border-gray-100 shrink-0 bg-white">
             <Button
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={!canProceed() || isSubmitting}
               className="w-full bg-gray-900 hover:bg-gray-800 text-white rounded-full px-8 h-12 font-semibold transition-all duration-200 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:scale-100 cursor-pointer"
             >
-              {currentStep === 3 ? "Підтвердити бронювання" : "Продовжити"}
+              {isSubmitting ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : currentStep === 3 ? "Підтвердити бронювання" : "Продовжити"}
             </Button>
           </div>
         )}
